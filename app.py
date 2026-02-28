@@ -97,3 +97,17 @@ elif tool == "Budget Report (Salary Optional)":
                 file_name=out_name,
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
+st.divider()
+
+st.markdown(
+    """
+    <div style='text-align: center; font-size:14px; padding:10px;'>
+        <b>Created by Hrushikesh Kesale | MH Circle</b><br>
+        If you like it, follow on Instagram:
+        <a href='https://www.instagram.com/cycle_stories4' target='_blank'>
+            @cycle_stories4
+        </a>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
