@@ -9,7 +9,7 @@ from budget_module import (
     build_output_excel_bytes
 )
 
-st.set_page_config(page_title="BSNL Finance Tools", layout="wide")
+st.set_page_config(page_title="Finance Tools @ Created By Hrushikesh Kesale MH Circle", layout="wide")
 
 st.title("BSNL Finance Tools (Single Page)")
 
