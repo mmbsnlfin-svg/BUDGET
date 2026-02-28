@@ -20,6 +20,7 @@ def _to_number(x) -> float:
     except Exception:
         return 0.0
 
+
 def convert_budget_to_df(budget_file, sheet_name: str | None = None) -> pd.DataFrame:
     xls = pd.ExcelFile(budget_file, engine="openpyxl")
     sheets = [sheet_name] if sheet_name else xls.sheet_names
@@ -32,6 +33,7 @@ def convert_budget_to_df(budget_file, sheet_name: str | None = None) -> pd.DataF
 
         particulars_col = 1
 
+        # find "Available Budge" column
         available_col = df.shape[1] - 1
         for r in range(min(30, len(df))):
             row_vals = df.iloc[r].astype(str).str.strip().tolist()
@@ -92,8 +94,9 @@ def convert_budget_to_df(budget_file, sheet_name: str | None = None) -> pd.DataF
               .agg({"TEXT": "first", "Fund CenterComm. Code": "first", "Budget Available": "sum"}))
     return out
 
+
 def salary_analysis_with_ledger(salary_file, budget_df: pd.DataFrame,
-                               salary_sheet: str = "Sheet1") -> tuple[pd.DataFrame, pd.DataFrame]:
+                               salary_sheet: str) -> tuple[pd.DataFrame, pd.DataFrame]:
     sal1 = pd.read_excel(salary_file, sheet_name=salary_sheet, engine="openpyxl")
 
     budget_map = {(r["Fund Center"], r["Comm. Code"]): float(r["Budget Available"])
@@ -201,17 +204,26 @@ def salary_analysis_with_ledger(salary_file, budget_df: pd.DataFrame,
 
     return salary_out, ledger_out
 
+
 def build_output_excel_bytes(budget_df: pd.DataFrame,
-                             salary_df: pd.DataFrame,
-                             ledger_df: pd.DataFrame) -> bytes:
+                             salary_df: pd.DataFrame | None = None,
+                             ledger_df: pd.DataFrame | None = None) -> bytes:
+    """
+    Always writes Budget sheets.
+    Writes Salary outputs only if salary_df and ledger_df provided.
+    """
     from io import BytesIO
     output = BytesIO()
+
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
         budget_df.to_excel(writer, sheet_name="BUDGET_ALL", index=False)
+
         for fc, grp in budget_df.groupby("Fund Center"):
             grp.to_excel(writer, sheet_name=str(fc)[:31], index=False)
-        salary_df.to_excel(writer, sheet_name="SALARY_ANALYSIS", index=False)
-        ledger_df.to_excel(writer, sheet_name="DONOR_LEDGER", index=False)
+
+        if salary_df is not None and ledger_df is not None:
+            salary_df.to_excel(writer, sheet_name="SALARY_ANALYSIS", index=False)
+            ledger_df.to_excel(writer, sheet_name="DONOR_LEDGER", index=False)
 
     output.seek(0)
     return output.read()
