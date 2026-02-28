@@ -1,4 +1,5 @@
 import streamlit as st
+import pandas as pd
 from datetime import datetime
 
 from capex_module import generate_capex_report_bytes
@@ -8,22 +9,24 @@ from budget_module import (
     build_output_excel_bytes
 )
 
-st.set_page_config(page_title="BSNL Tools", layout="wide")
+st.set_page_config(page_title="BSNL Finance Tools", layout="wide")
 
-st.title("BSNL Finance Tools")
+st.title("BSNL Finance Tools (Single Page)")
+
 tool = st.radio(
     "Select which tool to run:",
-    ["CAPEX Report Generator", "Budget + Salary Diversion Analysis"],
+    ["CAPEX Report Generator", "Budget Report (Salary Optional)"],
     horizontal=True
 )
 
 st.divider()
 
+# -------------------- CAPEX TOOL --------------------
 if tool == "CAPEX Report Generator":
     st.subheader("CAPEX Report Generator")
-    st.caption("Upload ONE Excel file that contains Sheet1 (raw) + Sheet2 (template).")
+    st.caption("Upload ONE Excel file that contains Sheet1 (Raw) + Sheet2 (Template).")
 
-    capex_file = st.file_uploader("Upload CAPEX Excel", type=["xlsx"])
+    capex_file = st.file_uploader("Upload CAPEX Excel", type=["xlsx"], key="capex")
 
     if capex_file is not None:
         if st.button("Generate CAPEX Report", type="primary"):
@@ -36,39 +39,60 @@ if tool == "CAPEX Report Generator":
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
 
-elif tool == "Budget + Salary Diversion Analysis":
-    st.subheader("Budget + Salary Diversion Analysis")
-    st.caption("Upload Budget Excel + Salary Excel. Output includes BUDGET_ALL, FundCenter sheets, SALARY_ANALYSIS, DONOR_LEDGER.")
+# -------------------- BUDGET TOOL --------------------
+elif tool == "Budget Report (Salary Optional)":
+    st.subheader("Budget Report")
+    st.caption("Upload Budget Excel (Required). Salary Excel is Optional.")
 
-    c1, c2 = st.columns(2)
-    with c1:
-        budget_file = st.file_uploader("Upload Budget Excel", type=["xlsx"], key="budget")
-    with c2:
-        salary_file = st.file_uploader("Upload Salary Excel", type=["xlsx"], key="salary")
+    budget_file = st.file_uploader("Upload Budget Excel (Required)", type=["xlsx"], key="budget")
+    salary_file = st.file_uploader("Upload Salary Excel (Optional)", type=["xlsx"], key="salary")
 
-    sheet_name = st.text_input("Budget sheet name (optional, leave blank for ALL sheets)", value="")
+    budget_sheet_name = st.text_input(
+        "Budget sheet name (Optional) - leave blank for ALL sheets",
+        value=""
+    )
 
-    if budget_file and salary_file:
-        if st.button("Run Budget Analysis", type="primary"):
-            # Budget parsing
-            budget_df = convert_budget_to_df(budget_file, sheet_name=sheet_name.strip() or None)
+    salary_sheet_name = None
+    if salary_file is not None:
+        try:
+            xls_sal = pd.ExcelFile(salary_file, engine="openpyxl")
+            salary_sheet_name = st.selectbox(
+                "Select Salary Sheet (only if Salary uploaded)",
+                options=xls_sal.sheet_names,
+                index=0
+            )
+        except Exception as e:
+            st.error(f"Unable to read Salary file sheets: {e}")
+            st.stop()
+
+    if budget_file is not None:
+        if st.button("Run Budget Report", type="primary"):
+            # Build budget df always
+            budget_df = convert_budget_to_df(budget_file, sheet_name=budget_sheet_name.strip() or None)
 
             if budget_df.empty:
                 st.error("No budget data extracted. Please check Budget file format.")
                 st.stop()
 
-            # Salary diversion + ledger
-            salary_df, ledger_df = salary_analysis_with_ledger(salary_file, budget_df)
-
-            # Build output excel bytes
-            out_bytes = build_output_excel_bytes(budget_df, salary_df, ledger_df)
-
+            # If salary uploaded -> include salary analysis, else only budget output
             today = datetime.today().strftime("%Y-%m-%d")
-            out_name = f"BUDGET_ANALYSIS_{today}.xlsx"
 
-            st.success("Budget analysis generated.")
+            if salary_file is not None and salary_sheet_name is not None:
+                salary_df, ledger_df = salary_analysis_with_ledger(
+                    salary_file,
+                    budget_df,
+                    salary_sheet=salary_sheet_name
+                )
+                out_bytes = build_output_excel_bytes(budget_df, salary_df, ledger_df)
+                out_name = f"BUDGET_WITH_SALARY_{today}.xlsx"
+                st.success("Budget + Salary report generated.")
+            else:
+                out_bytes = build_output_excel_bytes(budget_df)
+                out_name = f"BUDGET_ONLY_{today}.xlsx"
+                st.success("Budget-only report generated (Salary not uploaded).")
+
             st.download_button(
-                "Download Budget Analysis Output",
+                "Download Output Excel",
                 data=out_bytes,
                 file_name=out_name,
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
