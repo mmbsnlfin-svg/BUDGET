@@ -11,7 +11,7 @@ from budget_module import (
 
 st.set_page_config(page_title="Finance Tools @ Created By Hrushikesh Kesale MH Circle", layout="wide")
 
-st.title("Finance Tools Created By Hrushikesh Kesale If you like then follow me on instagram Cycle_stories4")
+st.title("Finance Tools @ Created By Hrushikesh Kesale MH Circle")
 
 tool = st.radio(
     "Select which tool to run:",
