@@ -9,101 +9,87 @@ from budget_module import (
     build_output_excel_bytes
 )
 
-st.set_page_config(page_title="Finance Tools @ Created By Hrushikesh Kesale MH Circle", layout="wide")
+st.set_page_config(page_title="BSNL Finance Tools", layout="wide")
 
-st.title("Finance Tools")
+st.title("BSNL Finance Tools")
 
 tool = st.radio(
-    "Select which tool to run:",
-    ["CAPEX Report Generator", "Budget Report (Salary Optional)"],
+    "Select Tool:",
+    ["CAPEX Report Generator", "Budget Report"],
     horizontal=True
 )
 
 st.divider()
 
-# -------------------- CAPEX TOOL --------------------
+# ---------------- CAPEX ----------------
 if tool == "CAPEX Report Generator":
-    st.subheader("CAPEX Report Generator")
-    st.caption("Upload ONE Excel file that contains Sheet1 (Raw) + Sheet2 (Template).")
+    st.subheader("CAPEX Report")
 
-    capex_file = st.file_uploader("Upload CAPEX Excel", type=["xlsx"], key="capex")
+    capex_file = st.file_uploader("Upload CAPEX Excel", type=["xlsx"])
 
-    if capex_file is not None:
-        if st.button("Generate CAPEX Report", type="primary"):
+    if capex_file:
+        if st.button("Generate CAPEX"):
             out_bytes, out_name = generate_capex_report_bytes(capex_file.read())
-            st.success("CAPEX report generated.")
-            st.download_button(
-                "Download CAPEX Output",
-                data=out_bytes,
-                file_name=out_name,
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+            st.success("CAPEX report ready")
+            st.download_button("Download", out_bytes, file_name=out_name)
+
+
+# ---------------- BUDGET ----------------
+elif tool == "Budget Report":
+    st.subheader("Budget Report (Salary Optional)")
+
+    budget_file = st.file_uploader("Upload Budget Excel (Required)", type=["xlsx"])
+    salary_file = st.file_uploader("Upload Salary Excel (Optional)", type=["xlsx"])
+
+    budget_sheet = st.text_input("Budget Sheet (optional)", "")
+
+    salary_sheet = None
+    if salary_file:
+        xls = pd.ExcelFile(salary_file)
+        salary_sheet = st.selectbox("Select Salary Sheet", xls.sheet_names)
+
+    if budget_file:
+        if st.button("Run Budget Report"):
+
+            budget_df = convert_budget_to_df(
+                budget_file,
+                sheet_name=budget_sheet.strip() or None
             )
-
-# -------------------- BUDGET TOOL --------------------
-elif tool == "Budget Report (Salary Optional)":
-    st.subheader("Budget Report")
-    st.caption("Upload Budget Excel (Required). Salary Excel is Optional.")
-
-    budget_file = st.file_uploader("Upload Budget Excel (Required)", type=["xlsx"], key="budget")
-    salary_file = st.file_uploader("Upload Salary Excel (Optional)", type=["xlsx"], key="salary")
-
-    budget_sheet_name = st.text_input(
-        "Budget sheet name (Optional) - leave blank for ALL sheets",
-        value=""
-    )
-
-    salary_sheet_name = None
-    if salary_file is not None:
-        try:
-            xls_sal = pd.ExcelFile(salary_file, engine="openpyxl")
-            salary_sheet_name = st.selectbox(
-                "Select Salary Sheet (only if Salary uploaded)",
-                options=xls_sal.sheet_names,
-                index=0
-            )
-        except Exception as e:
-            st.error(f"Unable to read Salary file sheets: {e}")
-            st.stop()
-
-    if budget_file is not None:
-        if st.button("Run Budget Report", type="primary"):
-            # Build budget df always
-            budget_df = convert_budget_to_df(budget_file, sheet_name=budget_sheet_name.strip() or None)
 
             if budget_df.empty:
-                st.error("No budget data extracted. Please check Budget file format.")
+                st.error("Budget not extracted. Check format.")
                 st.stop()
 
-            # If salary uploaded -> include salary analysis, else only budget output
             today = datetime.today().strftime("%Y-%m-%d")
 
-            if salary_file is not None and salary_sheet_name is not None:
+            if salary_file and salary_sheet:
                 salary_df, ledger_df = salary_analysis_with_ledger(
                     salary_file,
                     budget_df,
-                    salary_sheet=salary_sheet_name
+                    salary_sheet
                 )
-                out_bytes = build_output_excel_bytes(budget_df, salary_df, ledger_df)
-                out_name = f"BUDGET_WITH_SALARY_{today}.xlsx"
-                st.success("Budget + Salary report generated.")
+
+                out_bytes = build_output_excel_bytes(
+                    budget_df, salary_df, ledger_df
+                )
+
+                filename = f"BUDGET_WITH_SALARY_{today}.xlsx"
             else:
                 out_bytes = build_output_excel_bytes(budget_df)
-                out_name = f"BUDGET_ONLY_{today}.xlsx"
-                st.success("Budget-only report generated (Salary not uploaded).")
+                filename = f"BUDGET_ONLY_{today}.xlsx"
 
-            st.download_button(
-                "Download Output Excel",
-                data=out_bytes,
-                file_name=out_name,
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
-st.divider()
+            st.success("Report generated")
+            st.download_button("Download Output", out_bytes, file_name=filename)
 
+
+# ---------------- FOOTER ----------------
 st.markdown(
     """
-    <div style='text-align: center; font-size:14px; padding:10px;'>
+    <hr>
+    <div style='text-align:center; font-size:14px;'>
         <b>Created by Hrushikesh Kesale | MH Circle</b><br>
-        If you like it, follow on Instagram:
+        🚴 Follow on Instagram:
         <a href='https://www.instagram.com/cycle_stories4' target='_blank'>
             @cycle_stories4
         </a>
